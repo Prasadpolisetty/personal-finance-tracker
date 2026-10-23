@@ -1,6 +1,9 @@
 # Python
 __pycache__/
 *.py[cod]
+backend/.env
+backend/db.sqlite3
+backend/staticfiles/
 *.pyo
 
 # Virtual environments
@@ -14,6 +17,7 @@ __pycache__/
 
 # Django
 *.log
+*.pid
 db.sqlite3
 media/
 staticfiles/
