@@ -7,12 +7,14 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
+from django import forms
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .finance import estimate_uk_tax
-from .forms import RegistrationForm, SavingsGoalForm, TaxForm, TransactionForm
+from .forms import RegistrationForm, SavingsGoalForm, TaxForm, TaxJobForm, TransactionForm
 from .models import SavingsGoal, Transaction
+from .payroll import estimate_job_payroll, gross_for_period
+from .payslips import extract_payslip_text, review_payslip_text
 
 
 def register(request):
@@ -194,13 +196,81 @@ def upload_statement(request):
 
 @login_required
 def tax_calculator(request):
-    form = TaxForm(request.POST or None, initial={"tax_year": "2026-27", "region": "england"})
-    estimate = None
-    if request.method == "POST" and form.is_valid():
-        estimate = estimate_uk_tax(form.cleaned_data["gross_income"], form.cleaned_data["region"], form.cleaned_data["tax_year"])
-        estimate["tax_year"] = form.cleaned_data["tax_year"]
-        estimate["region"] = form.cleaned_data["region"].replace("-", " ").title()
-    return render(request, "finance/tax.html", {"form": form, "estimate": estimate})
+    initial = {"tax_year": "2026-27", "region": "england", "pay_date": date.today(), "jobs_count": "1"}
+    form = TaxForm(request.POST or None, initial=initial)
+    job_factory = forms.formset_factory(TaxJobForm, extra=4, max_num=4, validate_max=True)
+    posted_calculation = request.method == "POST" and "calculate" in request.POST
+    job_data = request.POST if posted_calculation else None
+    if posted_calculation and request.POST.get("jobs_count"):
+        job_data = request.POST.copy()
+        count = int(request.POST["jobs_count"])
+        job_data["job-TOTAL_FORMS"] = str(count)
+        job_data["job-MAX_NUM_FORMS"] = str(count)
+    jobs = job_factory(job_data, prefix="job")
+    for index, job_form in enumerate(jobs.forms):
+        job_form.fields["job_type"].initial = "main" if index == 0 else "additional"
+        job_form.fields["pay_frequency"].initial = "monthly"
+        job_form.fields["pay_basis"].initial = "hourly"
+        job_form.fields["tax_code"].initial = "1257L" if index == 0 else "BR"
+
+    estimates = []
+    totals = None
+    payslip_review = None
+    if request.method == "POST" and "payslip" in request.FILES:
+        upload = request.FILES["payslip"]
+        try:
+            if not upload.name.lower().endswith((".pdf", ".docx")):
+                raise ValueError("Choose a PDF or Word DOCX payslip.")
+            text = extract_payslip_text(upload)
+            payslip_review = review_payslip_text(text)
+            payslip_review["file_name"] = upload.name
+            if not any(value is not None and value != "" for value in payslip_review.values()):
+                payslip_review["message"] = "Readable text was found, but no common pay fields were recognised. Enter the details manually."
+        except Exception:
+            form.add_error(None, "This file could not be read as a supported payslip. Try an unprotected PDF with selectable text or a valid DOCX.")
+        except (ValueError, OSError, KeyError) as error:
+            form.add_error(None, str(error))
+    elif posted_calculation and form.is_valid():
+        if jobs.is_valid():
+            for index, job_form in enumerate(jobs.forms):
+                data = job_form.cleaned_data
+                if not data:
+                    continue
+                frequency = data["pay_frequency"]
+                gross = gross_for_period(
+                    pay_basis=data["pay_basis"],
+                    gross_pay=data.get("gross_pay") or Decimal("0"),
+                    hourly_rate=data.get("hourly_rate") or Decimal("0"),
+                    hours_per_week=data.get("hours_per_week") or Decimal("0"),
+                    frequency=frequency,
+                )
+                try:
+                    estimate = estimate_job_payroll(
+                        gross_pay=gross,
+                        frequency=frequency,
+                        tax_code=data["tax_code"],
+                        region=form.cleaned_data["region"],
+                        tax_year=form.cleaned_data["tax_year"],
+                        pay_date=form.cleaned_data["pay_date"],
+                        taxable_pay_ytd=data.get("taxable_pay_ytd"),
+                        tax_deducted_before_payday=data.get("tax_deducted_ytd"),
+                        actual_tax_this_pay=data.get("actual_tax_this_pay"),
+                    )
+                except ValueError as error:
+                    job_form.add_error("tax_code", str(error))
+                    continue
+                estimate.update({"job_type": data["job_type"], "frequency": frequency, "tax_code": data["tax_code"]})
+                estimates.append(estimate)
+        else:
+            form.add_error(None, "Check the job details, including the pay basis and year-to-date values.")
+        if estimates:
+            totals = {
+                "gross": sum((item["gross_pay"] for item in estimates), Decimal("0")),
+                "tax": sum((item["income_tax"] for item in estimates), Decimal("0")),
+                "ni": sum((item["national_insurance"] for item in estimates), Decimal("0")),
+                "net": sum((item["net_pay"] for item in estimates), Decimal("0")),
+            }
+    return render(request, "finance/tax.html", {"form": form, "jobs": jobs, "estimates": estimates, "totals": totals, "payslip_review": payslip_review})
 
 
 @login_required

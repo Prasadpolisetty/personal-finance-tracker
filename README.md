@@ -9,7 +9,8 @@ A private, account-based web application to track expenses, income, savings goal
 - Add, edit, delete, filter, search, and export your own transaction history. Loan repayments and EMIs can be recorded as expenses.
 - Import up to 1,000 transactions from a CSV statement (2 MB maximum).
 - Manual savings goals with progress tracking; these are not linked to bank accounts.
-- UK annual salary Income Tax and employee Class 1 NI estimates for 2025/26 and 2026/27, with England, Wales, Northern Ireland and Scotland options.
+- UK PAYE estimates for up to four weekly or monthly jobs, including hourly-rate-to-gross conversion, separate tax codes such as 1257L/BR, estimated Income Tax, employee NI, net pay, and optional year-to-date comparison.
+- Temporary, review-first text extraction from searchable PDF or DOCX payslips; uploaded payslips are not saved. Image-only/scanned PDFs are not OCRed. These pay estimates are indicative, not official payroll calculations.
 - GBP, USD, EUR and INR transaction labels. Different currencies remain separate; no exchange rate is assumed.
 - Financial records are scoped to the signed-in account.
 
@@ -59,9 +60,11 @@ date,type,amount,category,description,currency
 
 Rows are validated before any are saved. Supported currencies are GBP, USD, EUR and INR. CSV only; PDF and image statement import is not included. Review imported rows in transaction history. Export downloads the signed-in user's original amounts and currencies.
 
-## Tax estimate scope
+## PAYE planner scope and payslip privacy
 
-The calculator provides an indicative annual estimate based on standard Personal Allowance and taper, the selected nation's salary income-tax bands, and annualised employee Class 1 category A NI. It does not calculate pension relief, student loans, benefits, tax codes, self-employment, dividends, savings income, employer NI, pay-period rounding, or other NI categories. Actual payroll deductions may differ. The calculator is for personal planning, not tax advice. Sources: [GOV.UK Income Tax rates](https://www.gov.uk/income-tax-rates), [Scottish Income Tax](https://www.gov.uk/scottish-income-tax), and [National Insurance rates](https://www.gov.uk/national-insurance/how-much-you-pay).
+The PAYE planner estimates each job separately. It starts with 1257L for the main job and BR for additional jobs as suggestions, but you can select other listed codes. Confirm the exact code (including any S/C prefix or W1/M1 basis) on your HMRC notice/payslip. If you enter taxable pay earlier this tax year and Income Tax deducted before this payday, the planner estimates an illustrative cumulative deduction; entering the payslip tax as well compares actual to estimated tax-to-date. It does not reproduce HMRC payroll tables, tax-code notices or payroll rounding. NI is an indicative category-A employee estimate. Pension, student-loan, benefits, other deductions, irregular pay and HMRC adjustments may change actual net pay. For official results, check [HMRC's Income Tax estimator](https://www.gov.uk/estimate-income-tax) or [PAYE calculator](https://www.gov.uk/guidance/work-out-an-employees-income-tax).
+
+Payslip uploads accept PDF and Word DOCX up to 5 MB (10 PDF pages maximum). The uploaded file and extracted text are used in memory for that request and are not stored in the application database. Extraction only suggests a tax code, gross pay and tax amount; it does not fill or submit the calculator automatically, and the user must verify all values. Scanned/image-only PDFs are not OCRed, and encrypted PDFs are rejected. Sources: [HMRC tax codes](https://www.gov.uk/tax-codes/what-your-tax-code-means), [HMRC multi-job guidance](https://www.gov.uk/guidance/how-tax-works-if-you-have-more-than-one-job), and [HMRC rates and thresholds](https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027).
 
 ## Checks
 
