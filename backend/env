@@ -1,0 +1,8 @@
+# Set this in PowerShell before starting Django to store the database on D:.
+# Create the directory first: New-Item -ItemType Directory -Force D:\PersonalFinance
+FINANCE_DB_PATH=D:\PersonalFinance\data.sqlite3
+
+# Use a unique secret key for deployments; do not commit secrets.
+DJANGO_SECRET_KEY=replace-with-a-long-random-secret
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_DEBUG=True
