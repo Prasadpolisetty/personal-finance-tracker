@@ -104,6 +104,24 @@ class PayslipExtractionTests(TestCase):
         self.assertEqual(result["suggested_gross_pay"], Decimal("2500.00"))
         self.assertEqual(result["suggested_tax_deducted"], Decimal("300.00"))
 
+    def test_income_tax_suggestion_supports_common_payroll_labels(self):
+        for payslip_text in (
+            "Income Tax £84.20",
+            "PAYE tax £84.20",
+            "Tax this period: 84.20",
+            "Tax paid £84.20",
+            "Tax £84.20",
+        ):
+            with self.subTest(payslip_text=payslip_text):
+                result = review_payslip_text(payslip_text)
+                self.assertEqual(result["suggested_tax_deducted"], Decimal("84.20"))
+
+    def test_tax_ytd_is_not_mistaken_for_tax_this_payday(self):
+        for payslip_text in ("Tax YTD £510.40", "Tax code £1,257"):
+            with self.subTest(payslip_text=payslip_text):
+                result = review_payslip_text(payslip_text)
+                self.assertIsNone(result["suggested_tax_deducted"])
+
     def test_unsupported_file_type_is_rejected(self):
         upload = SimpleUploadedFile("payslip.txt", b"1257L")
         with self.assertRaisesMessage(ValueError, "Choose a PDF or Word DOCX"):

@@ -52,11 +52,31 @@ def _find_money(text, label_pattern):
         return None
 
 
+def _find_labeled_tax(text):
+    """Recognize common UK payslip tax labels, including table-separated values."""
+    labels = r"income\s+tax|tax\s+deducted|tax(?!\s*(?:code|ytd|year[ -]?to[ -]?date))|paye(?:\s+tax)?"
+    value = _find_money(text, labels)
+    if value is not None:
+        return value
+
+    # Some PDF extractors put the label and amount on adjacent lines.
+    match = re.search(
+        rf"(?im)^\s*(?:{labels})\s*[:\-]?\s*\n\s*(?:£\s*)?([0-9][0-9,]*(?:\.\d{{1,2}})?)\s*$",
+        text,
+    )
+    if not match:
+        return None
+    try:
+        return Decimal(match.group(1).replace(",", ""))
+    except InvalidOperation:
+        return None
+
+
 def review_payslip_text(text):
     """Return suggestions only; a user must verify each parsed payslip field."""
     code = re.search(r"(?i)\b(S?1257L|C1257L|BR|D0|D1|SD0|SD1|SD2|SD3|SBR|CBR|CD0|CD1)(?:\s*(W1|M1|X))?\b", text)
     return {
         "suggested_tax_code": "" if not code else "".join(part for part in code.groups() if part).upper(),
         "suggested_gross_pay": _find_money(text, r"gross\s*(?:pay|earnings)?|total\s*earnings|taxable\s*pay"),
-        "suggested_tax_deducted": _find_money(text, r"income\s*tax|tax\s*deducted|paye\s*tax"),
+        "suggested_tax_deducted": _find_labeled_tax(text),
     }
